@@ -4,19 +4,29 @@ import 'package:flutter/material.dart';
 class AboutUsPage extends StatelessWidget {
   final List<Map<String, String>> teamMembers = [
     {
-      "name": "Đàm Quang Phong",
-      "mssv": "22010466",
-      "role": "Làm trang chủ Home, tìm kiếm, giỏ hàng, trang tài khoản, đăng nhập đăng kí, kết nối firebase",
-    },
-    {
       "name": "Lại Quang Tuấn",
       "mssv": "22010438",
-      "role": "Làm trang thông tin sản phẩm, thanh toán, trang thông báo, viết báo cáo",
+      "role": "Kết nối Firebase, làm trang Web Admin, trang chủ.",
     },
     {
-      "name": "Trịnh Đức Việt",
-      "mssv": "22010096",
-      "role": "Làm trang Store, các phần chia loại sản phẩm, làm slide, tạo dữ liệu cho firestore database",
+      "name": "Phạm Việt Phương",
+      "mssv": "22010465",
+      "role": "Đăng nhập, đăng kí, trang Tài khoản, tạo dữ liệu cho Firestore",
+    },
+    {
+      "name": "Nguyễn Hà Ninh",
+      "mssv": "22010470",
+      "role": "Làm trang thông tin sản phẩm, Thanh toán, lịch sử",
+    },
+    {
+      "name": "Nguyễn Thị Thủy Tiên",
+      "mssv": "22010268",
+      "role": "Giỏ hàng, thông báo,tạo dữ liệu cho Firestore",
+    },
+    {
+      "name": "Trần Hồng Ngọc",
+      "mssv": "22010245",
+      "role": "Trang cửa hàng, phân loại sản phẩm, tìm kiếm.",
     },
   ];
 
