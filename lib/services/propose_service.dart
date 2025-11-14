@@ -6,6 +6,8 @@ class ProposeService {
   
   // Ghi lại lịch sử xem sản phẩm của người dùng
   Future<void> logUserInteraction(String userId, String productId) async {
+    //  print("📌 Ghi lịch sử xem cho userId: $userId, productId: $productId");
+    try {
       await _firestore
           .collection('users')
           .doc(userId)

@@ -97,13 +97,14 @@ Sản phẩm:
 - Link: product://detail/$id
 ''';
       }).join("\n");
-final systemPrompt = '''
+
+      final systemPrompt = '''
 Bạn là một trợ lý thân thiện chuyên tư vấn sản phẩm trong cửa hàng thương mại điện tử.
 
 Hãy trả lời ngắn gọn, thân thiện và chỉ giới thiệu **tối đa 3 sản phẩm** mỗi lần.  
 Mỗi sản phẩm cần có:
 - Tên sản phẩm
-- Giá (đơn vị: VND)
+- Giá (đơn vị: VND) 
 - Giảm giá (nếu có)
 - Link đúng định dạng: product://detail/[id sản phẩm]
 
@@ -111,7 +112,6 @@ Danh sách sản phẩm hiện có:
 $productTextList
 ''';
 
-      // Chuẩn bị nội dung hội thoại
       final messages = [
         {
           "role": "user",
@@ -205,7 +205,8 @@ $productTextList
           .get();
 
       if (!doc.exists) return;
-final product = Product.fromMap(doc.data()!, doc.id);
+
+      final product = Product.fromMap(doc.data()!, doc.id);
 
       if (!mounted) return;
       Navigator.push(

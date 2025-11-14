@@ -11,16 +11,31 @@ import 'package:ecommerece_flutter_app/common/helper/helper.dart';
 import '../../models/address_model.dart';
 import '../../services/checkout_service.dart';
 import '../../services/notification_service.dart';
+// >>> thêm để xóa giỏ khi thanh toán toàn bộ
+import '../../services/cart_service.dart';
 
 class CheckoutPage extends StatefulWidget {
-  final CartItem cartItem;
-  final double totalPrice;
+  // mở rộng: có thể là 1 item (luồng cũ) hoặc nhiều item (toàn bộ giỏ)
+  final CartItem? cartItem; // dùng khi mua 1 sản phẩm (luồng cũ)
+  final double? totalPrice; // tổng tiền của 1 sản phẩm (luồng cũ)
+  final List<CartItem>? items; // dùng khi thanh toán toàn bộ giỏ
 
+  // Luồng cũ: giữ nguyên cách gọi hiện có
   const CheckoutPage({
     Key? key,
     required this.cartItem,
     required this.totalPrice,
+    this.items,
   }) : super(key: key);
+
+  // Luồng mới: thanh toán toàn bộ giỏ bằng 1 đơn duy nhất
+  const CheckoutPage.all({
+    Key? key,
+    required List<CartItem> items,
+  })  : cartItem = null,
+        totalPrice = null,
+        items = items,
+        super(key: key);
 
   @override
   _CheckoutPageState createState() => _CheckoutPageState();
@@ -44,11 +59,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
+  bool get _isAllCart =>
+      widget.items != null && (widget.items?.isNotEmpty ?? false);
+
+  int get _grandTotal {
+    if (_isAllCart) {
+      return widget.items!.fold(0, (s, e) => s + e.total);
+    }
+    return (widget.totalPrice ?? 0).toInt();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Check_Out".tr()),
+        title: Text(_isAllCart ? 'Thanh toán toàn bộ' : "Check_Out".tr()),
         elevation: 1,
         iconTheme: IconThemeData(
             color: Helper.isDarkMode(context)
@@ -68,9 +93,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Product".tr(),
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        _buildCartItem(widget.cartItem)
+                        if (_isAllCart)
+                          ...widget.items!.map(_buildCartItem)
+                        else
+                          _buildCartItem(widget.cartItem!),
                       ],
                     ),
                   ),
@@ -118,7 +147,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Payment".tr(),
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
                           value: _paymentMethod,
@@ -149,7 +179,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ),
           // Thanh toán
           Container(
-            // color: Colors.white,
             padding: const EdgeInsets.all(12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -160,7 +189,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     Text("Total".tr(),
                         style: Theme.of(context).textTheme.titleMedium),
                     Text(
-                      Helper.formatCurrency(widget.totalPrice.toInt()),
+                      Helper.formatCurrency(_grandTotal),
                       style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -177,8 +206,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 40, vertical: 12),
                   ),
-                  child: Text("Place_Order".tr(),
-                      style: Theme.of(context).textTheme.headlineSmall),
+                  child: Text(
+                    _isAllCart ? 'Place_Order'.tr() : "Place_Order".tr(),
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                 ),
               ],
             ),
@@ -251,8 +282,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
             children: [
               Text("Confirm_notification".tr()),
               const SizedBox(height: 16),
-              Text("total_price".tr(
-                  args: [Helper.formatCurrency(widget.totalPrice.toInt())])),
+              Text(
+                  "total_price".tr(args: [Helper.formatCurrency(_grandTotal)])),
               const SizedBox(height: 8),
               Text("payment_method".tr(namedArgs: {"method": _paymentMethod})),
               const SizedBox(height: 8),
@@ -269,35 +300,69 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
             TextButton(
               onPressed: () async {
-                String userId = AuthService().getUserId();
-                await FirebaseFirestore.instance
+                final userId = AuthService().getUserId();
+                final orderedCol = FirebaseFirestore.instance
                     .collection('users')
                     .doc(userId)
-                    .collection('ordered')
-                    .add({
-                  "address": _selectedAddress!.toMap(),
-                  "paymentMethod": _paymentMethod,
-                  "totalPrice": widget.totalPrice,
-                  "status": "Pending",
-                  "product": {
-                    "name": widget.cartItem.name,
-                    "imageUrl": widget.cartItem.imageUrl,
-                    "price": widget.cartItem.price,
-                    "quantity": widget.cartItem.quantity,
-                    "total": widget.cartItem.total,
-                  },
-                  "createdAt": FieldValue.serverTimestamp(),
-                });
+                    .collection('ordered');
+
+                if (_isAllCart) {
+                  // Ghi 1 đơn DUY NHẤT với mảng items[]
+                  final items = widget.items!
+                      .map((it) => {
+                            "productId": it.id,
+                            "name": it.name,
+                            "imageUrl": it.imageUrl,
+                            "price": it.price,
+                            "quantity": it.quantity,
+                            "lineTotal": it.total,
+                          })
+                      .toList();
+
+                  await orderedCol.add({
+                    "address": _selectedAddress!.toMap(),
+                    "paymentMethod": _paymentMethod,
+                    "totalPrice": _grandTotal,
+                    "status": "Pending",
+                    "items": items,
+                    "createdAt": FieldValue.serverTimestamp(),
+                  });
+
+                  // clear giỏ sau khi tạo 1 đơn tổng
+                  await CartService().clearCart(userId);
+
+                  await NotificationService.addNotification(userId,
+                      "Bạn đã đặt đơn hàng thành công (${items.length} sản phẩm). Cảm ơn bạn!");
+                } else {
+                  // Hành vi CŨ: 1 sản phẩm -> field 'product'
+                  await orderedCol.add({
+                    "address": _selectedAddress!.toMap(),
+                    "paymentMethod": _paymentMethod,
+                    "totalPrice": widget.totalPrice,
+                    "status": "Pending",
+                    "product": {
+                      "name": widget.cartItem!.name,
+                      "imageUrl": widget.cartItem!.imageUrl,
+                      "price": widget.cartItem!.price,
+                      "quantity": widget.cartItem!.quantity,
+                      "total": widget.cartItem!.total,
+                    },
+                    "createdAt": FieldValue.serverTimestamp(),
+                  });
+
+                  await NotificationService.addNotification(userId,
+                      "You have successfully ordered ${widget.cartItem!.name}! Thank you!");
+                }
+
+                if (!mounted) return;
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => PaymentSuccessScreen()));
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => PaymentSuccessScreen()),
+                );
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("Check_Out_Success".tr())),
                 );
-                await NotificationService.addNotification(
-                    AuthService().getUserId(),
-                    "You have successfully ordered ${widget.cartItem.name}! Thank you!");
               },
               child: Text("Confirm".tr()),
             ),
@@ -314,9 +379,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
       title:
           Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Text("Quantity: ${item.quantity}"),
-      trailing: Text(Helper.formatCurrency(item.total.toInt()),
-          style: const TextStyle(
-              fontWeight: FontWeight.bold, color: KColors.primaryColor)),
+      trailing: Text(
+        Helper.formatCurrency(item.total.toInt()),
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, color: KColors.primaryColor),
+      ),
     );
   }
 }
